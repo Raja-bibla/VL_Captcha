@@ -1,271 +1,383 @@
-# VL-KAN — Variable-Length CAPTCHA Recognition with Kolmogorov–Arnold Networks
 
-Reference PyTorch 2.x implementation of **VL-KAN**, a variable-length CAPTCHA
-recognizer that fuses a multi-scale convolutional trunk with **Kolmogorov–Arnold
-Network (KAN)** layers and a length-/boundary-aware CTC decoder. It handles
-numeric (10 classes) and case-sensitive alphanumeric (62 classes) codes of
-length **3–10**.
+<div align="center">
 
-The architecture is trained end-to-end with a three-phase curriculum and a
-multi-task objective combining **Length-Aware Dynamic CTC**, a **length** head,
-and a **boundary** head, with optional online **Adversarial CAPTCHA Augmentation
-(ACA)**.
+# VL-KAN
+
+### Variable-Length Visual Sequence Recognition with Kolmogorov–Arnold Networks
+
+**An experimental deep learning framework exploring adaptive visual
+sequence representation, variable-length recognition and
+alignment-aware learning on synthetic CAPTCHA datasets.**
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
+![Deep Learning](https://img.shields.io/badge/Deep_Learning-8B5CF6?style=for-the-badge)
+![Computer Vision](https://img.shields.io/badge/Computer_Vision-0066FF?style=for-the-badge)
+![Research](https://img.shields.io/badge/Research-Implementation-059669?style=for-the-badge)
+
+**Multi-Scale Feature Learning · Kolmogorov–Arnold Networks ·
+Sequence Modelling · Curriculum Learning**
+
+</div>
 
 ---
 
-## 1. Project layout
+## Abstract
 
-```
-.
-├── datasets/        # vocabulary, procedural generator, augmentations, Dataset/collate
-├── data/            # adversarial (PGD) augmentation utilities
+Visual sequence recognition presents several fundamental challenges
+in computer vision, particularly when the number of characters,
+their spatial positions and their visual appearances are unknown.
+
+VL-KAN is a research-oriented PyTorch implementation that explores
+the integration of convolutional feature extraction,
+Kolmogorov–Arnold Networks (KANs), attention mechanisms and
+alignment-aware sequence learning.
+
+The framework investigates variable-length character recognition
+using procedurally generated synthetic images, with an emphasis on
+architectural experimentation, controlled evaluation and
+reproducibility.
+
+The project provides a modular environment for studying how
+different neural network components influence character recognition,
+sequence alignment and computational efficiency.
+
+---
+
+## Research Motivation
+
+Conventional fixed-length recognition architectures assume a
+predetermined output sequence length.
+
+This assumption introduces limitations when dealing with
+variable-length visual sequences.
+
+Key research challenges include:
+
+- Unknown character sequence lengths.
+- Irregular spacing between characters.
+- Spatial distortions and overlapping visual features.
+- Alignment between visual representations and textual labels.
+- Generalization across different synthetic image distributions.
+- Balancing recognition quality and model complexity.
+
+VL-KAN investigates these challenges through a combination of
+adaptive feature representation and sequence-aware learning.
+
+---
+
+## Architecture Overview
+
+The framework combines several research components:
+
+| Component | Research Purpose |
+| :--- | :--- |
+| ResNet-18 sequence backbone | Convolutional visual representation |
+| Multi-scale feature pyramid | Features at different spatial scales |
+| Kolmogorov–Arnold Networks | Learnable nonlinear transformations |
+| Attention-augmented KAN | Context-aware feature representation |
+| CTC objective | Alignment-free sequence learning |
+| Auxiliary prediction heads | Multi-task representation learning |
+| Curriculum learning | Progressive learning across task difficulty |
+
+The architecture separates visual representation learning from
+sequence-level prediction, enabling controlled experimentation
+with different model components.
+
+---
+
+## Kolmogorov–Arnold Networks
+
+Traditional multilayer perceptrons use learnable linear weights
+combined with fixed nonlinear activation functions.
+
+Kolmogorov–Arnold Networks investigate an alternative approach
+in which learnable univariate functions are associated with
+connections between network components.
+
+The Kolmogorov–Arnold representation theorem motivates the
+representation of multivariate continuous functions through
+compositions and sums of univariate functions.
+
+A conceptual representation is:
+
+$$
+f(x_1,\ldots,x_n)
+=
+\sum_{q=0}^{2n}
+\Phi_q
+\left(
+\sum_{p=1}^{n}
+\phi_{q,p}(x_p)
+\right)
+$$
+
+In this framework, KAN-based transformations are explored as
+an alternative mechanism for nonlinear feature representation
+within a visual recognition architecture.
+
+---
+
+## Machine Learning Concepts
+
+| Concept | Application in the Framework |
+| :--- | :--- |
+| Convolutional Neural Networks | Spatial feature extraction |
+| Residual Learning | Deep visual representations |
+| Multi-scale Learning | Representation across spatial resolutions |
+| Attention | Contextual feature relationships |
+| Sequence Modelling | Variable-length character sequences |
+| Multi-task Learning | Joint optimization of related objectives |
+| Curriculum Learning | Progressive task complexity |
+| Data Augmentation | Generalization across synthetic variations |
+| Ablation Studies | Evaluation of architectural contributions |
+
+---
+
+## Research Framework
+
+The repository is organized into independent modules covering
+data generation, model architectures, optimization objectives,
+evaluation and experimental comparisons.
+
+```text
+VL_Captcha/
+│
+├── data/
+├── datasets/
+├── decode/
+├── evaluation/
+├── experiments/
+├── losses/
 ├── models/
-│   ├── backbone/    # ResNet18Seq sequence trunk
-│   ├── kan/         # spline, KANLayer, KANBlock, multi-scale pyramid, A-KAN block
-│   ├── heads/       # boundary head + soft-target builder
-│   ├── deepcaptcha.py                 # fixed-length CNN baseline (Deep-CAPTCHA)
-│   ├── variable_length_deepcaptcha.py # CRNN + CTC + length head (VarLen baseline)
-│   └── kan_captcha.py                 # VLKAN (full model)
-├── losses/          # Length-Aware Dynamic CTC loss
-├── decode/          # length/boundary-aware CTC beam search
-├── training/        # Trainer engine (AMP, grad-accum, curriculum, checkpointing)
-├── evaluation/      # metrics (CAcc/SAcc/LAcc/CER), latency, decode adapters
-├── experiments/     # automated structural ablation harness
-├── train.py         # curriculum training entry point
-└── infer.py         # inference loop
+│   ├── backbone/
+│   ├── kan/
+│   └── heads/
+├── training/
+│
+├── environment.yml
+├── requirements.txt
+├── train.py
+├── infer.py
+└── README.md
 ```
+
+This modular organization makes the project useful for examining
+individual components and comparing architectural alternatives.
 
 ---
 
-## 2. Installation
+## Experimental Methodology
 
-**pip**
+A meaningful evaluation of visual sequence recognition requires
+more than a single aggregate accuracy value.
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-```
+The framework includes utilities for examining character-level
+recognition, sequence-level correctness, length prediction and
+computational performance.
 
-**conda**
+### Evaluation Metrics
 
-```bash
-conda env create -f environment.yml
-conda activate vlkan
-```
+| Metric | Description |
+| :--- | :--- |
+| Character Accuracy (CAcc) | Character-level recognition quality |
+| Sequence Accuracy (SAcc) | Exact-match sequence correctness |
+| Length Accuracy (LAcc) | Correct prediction of sequence length |
+| Character Error Rate (CER) | Normalized character edit distance |
+| Latency | Time required for prediction |
+| Throughput | Number of samples processed per unit time |
 
-> **CUDA:** install the matching PyTorch build from the official index
-> (`pip install torch --index-url https://download.pytorch.org/whl/cu121`) before
-> the remaining requirements. The code auto-selects CUDA when available; pass
-> `--device cpu` to force CPU.
+### Character Error Rate
 
-A quick environment check:
+Character Error Rate measures the difference between predicted
+and reference character sequences using edit distance.
 
-```bash
-python -c "import torch, PIL; print('torch', torch.__version__)"
-```
+$$
+CER = \frac{S+D+I}{N}
+$$
 
----
+Where:
 
-## 3. Data / preprocessing
+- **S** represents character substitutions.
+- **D** represents character deletions.
+- **I** represents character insertions.
+- **N** represents the total number of reference characters.
 
-CAPTCHA samples are generated **procedurally and deterministically** — there is no
-download or offline preprocessing step. `datasets/CaptchaDataset` renders glyphs
-(per-glyph rotation, tracking, baseline jitter) and `datasets/CaptchaAugmentor`
-applies on-device, batched distortions (elastic, perspective, Perlin clutter,
-spline occlusion). Determinism is keyed by `(base_seed, epoch, index)` so runs are
-reproducible and resumable.
+Character Accuracy is defined in the implementation as:
 
-Sanity-check the generator and augmentation pipeline:
+$$
+CAcc = 1-CER
+$$
 
-```bash
-python -c "
-from datasets.dataset import CaptchaDataset
-from datasets.vocabulary import build_vocabulary
-v = build_vocabulary('alphanumeric')
-ds = CaptchaDataset(v, charset='0123456789', samples_per_epoch=4)
-s = ds[0]
-print('text=', s['text'], 'image=', tuple(s['image'].shape))
-"
-```
+### Sequence Accuracy
 
----
+Sequence accuracy measures the proportion of predictions that
+exactly match their corresponding reference sequences.
 
-## 4. Curriculum training
+$$
+SAcc =
+\frac{\text{Exact Matches}}
+{\text{Total Sequences}}
+$$
 
-`train.py` runs the full three-phase curriculum over a **fixed 62-class
-vocabulary** (so the CTC head dimension is constant across phases):
-
-| Phase | Charset | Lengths | ACA |
-| --- | --- | --- | --- |
-| **I** — numeric, short | `0–9` | 3–5 | off |
-| **II** — numeric, full | `0–9` | 3–10 | off |
-| **III** — alphanumeric | `0–9A–Za–z` | 3–10 | on (10%) |
-
-Features: `torch.amp` mixed precision (bfloat16 default; float16 auto-enables a
-`GradScaler`), gradient accumulation with global-norm clipping (≤ 5.0),
-multi-task weighting `α=1.0` (CTC) · `β=0.3` (length) · `γ=0.2` (boundary),
-atomic checkpointing, and TensorBoard telemetry.
-
-**Launch a run**
-
-```bash
-python train.py --output-dir artifacts/run1
-```
-
-**Common overrides**
-
-```bash
-python train.py --output-dir artifacts/run1 \
-  --batch-size 256 --grad-accum 2 --amp-dtype bfloat16 \
-  --phase1-epochs 20 --phase2-epochs 40 --phase3-epochs 60 \
-  --lr 3e-4 --weight-decay 0.05 --num-workers 8
-```
-
-**Pause / resume** (checkpoints are written to `<output-dir>/checkpoints/last.pt`):
-
-```bash
-python train.py --output-dir artifacts/run1 \
-  --resume artifacts/run1/checkpoints/last.pt
-```
-
-**Tiny end-to-end validation run (CPU):**
-
-```bash
-python train.py --smoke --output-dir /tmp/vlkan_smoke
-```
-
-**Monitor:**
-
-```bash
-tensorboard --logdir artifacts/run1/logs
-```
-
-**Validation during training**
-
-By default an 80/20 train/validation split is applied and validation runs at the
-end of every epoch. The validation set is generated from a separate seed space so
-it never overlaps with training data. Metrics logged under `val/` in TensorBoard:
-
-| Tag | Meaning |
-|-----|---------|
-| `val/loss_lad_ctc` | LAD-CTC loss on clean validation images |
-| `val/CAcc` | Character Accuracy `= 1 – CER` |
-| `val/SAcc` | Sequence (exact-match) Accuracy |
-| `val/LAcc` | Length Accuracy |
-| `val/CER` | Character Error Rate |
-
-The best `SAcc` checkpoint is saved to `<output-dir>/checkpoints/best.pt`
-automatically.
-
-Override the defaults:
-
-```bash
-# Larger validation set (30 %), evaluated every 5 epochs
-python train.py --output-dir artifacts/run1 --val-split 0.3 --val-every 5
-
-# Disable periodic validation (val-every larger than any phase's epoch count)
-python train.py --output-dir artifacts/run1 --val-every 9999
-```
+Character-level and sequence-level metrics provide complementary
+perspectives on recognition quality.
 
 ---
 
-## 5. Structural ablations
+## Architectural Comparisons
 
-`experiments/ablation.py` steps through four variants spanning the
-variable-length and KAN axes, warm-trains each in its native regime, evaluates on
-a fixed held-out set, and emits Markdown comparison tables.
+The repository includes experimental infrastructure for studying
+the contribution of different neural network architectures.
 
-| Variant | Variable length | KAN | Model |
-| --- | :---: | :---: | --- |
-| Baseline | – | – | `DeepCaptcha` (fixed-length CNN) |
-| Baseline + VarLen | yes | – | `VariableLengthDeepCaptcha` (CRNN + CTC) |
-| Baseline + KAN | yes | partial | `VLKAN` without A-KAN attention |
-| Full VL-KAN | yes | yes | `VLKAN` (pyramid + A-KAN blocks) |
+| Architecture | Research Focus |
+| :--- | :--- |
+| DeepCaptcha | Fixed-length convolutional baseline |
+| VariableLengthDeepCaptcha | Variable-length sequence baseline |
+| KAN-based variant | Nonlinear representation learning |
+| VL-KAN | Combined architectural approach |
 
-**Run:**
+The purpose of architectural ablation is to determine whether
+individual components contribute meaningfully to recognition
+quality and computational efficiency.
 
-```bash
-python -m experiments.ablation \
-  --train-steps 200 --eval-samples 512 --batch-size 64 \
-  --output artifacts/ablation.md
-```
+A complete experimental report should include:
 
-**Tiny validation run (CPU):**
-
-```bash
-python -m experiments.ablation --smoke
-```
-
-The report (`artifacts/ablation.md`) contains a capability matrix plus a metrics
-table with **CAcc**, **SAcc**, **LAcc**, **CER**, per-image **latency**, and
-**throughput**.
+- Dataset generation configuration.
+- Model parameter counts.
+- Training and validation methodology.
+- Independent evaluation metrics.
+- Hardware configuration.
+- Inference latency measurements.
+- Experimental seeds and uncertainty estimates.
 
 ---
 
-## 6. Inference
+## Experimental Results
 
-`infer.py` loads a trained checkpoint and transcribes images using the
-length-/boundary-aware beam search (greedy fallback via `--greedy`).
+The implementation includes evaluation and ablation utilities.
 
-**Transcribe image files:**
+Numerical performance claims should be accompanied by
+corresponding experimental logs, dataset configurations and
+reproducible evaluation evidence.
 
-```bash
-python infer.py --checkpoint artifacts/run1/checkpoints/last.pt \
-  --images "samples/*.png"
-```
-
-**Generate and transcribe synthetic samples (no input files):**
-
-```bash
-python infer.py --checkpoint artifacts/run1/checkpoints/last.pt --synthetic 8
-```
-
-Output lists `name  prediction  truth` per image and a latency summary
-(mean / p95 / throughput).
-
-**Programmatic loop:**
-
-```python
-import torch
-from datasets.vocabulary import build_vocabulary
-from evaluation.decoding import beam_ctc_decode
-from infer import load_model, _synthetic_batch
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-vocab = build_vocabulary("alphanumeric")
-model = load_model("artifacts/run1/checkpoints/last.pt", vocab.size, device)
-
-images, truths = _synthetic_batch(8, seed=0)
-with torch.no_grad():
-    preds = beam_ctc_decode(model(images.to(device)), vocab)
-print(list(zip(preds, truths)))
-```
+No independently reproduced benchmark results are claimed
+in this documentation.
 
 ---
 
-## 7. Metrics
+## Technology Stack
 
-`evaluation/metrics.py` provides the headline measures:
-
-- **CAcc** — Character Accuracy, `1 − CER`, from corpus-level Levenshtein edit distance.
-- **SAcc** — Sequence (exact-match) Accuracy.
-- **LAcc** — Length Accuracy (predicted length equals ground-truth length).
-- **CER** — aggregate Character Error Rate.
-
-Latency/throughput are profiled with `Timer` and `LatencyTracker`
-(mean / p50 / p95 / p99 and items/sec).
-
-```python
-from evaluation.metrics import evaluate_predictions
-m = evaluate_predictions(["abc", "1234"], ["abc", "1235"])
-print(m.as_dict())
-```
+| Category | Technology |
+| :--- | :--- |
+| Programming Language | Python |
+| Deep Learning Framework | PyTorch |
+| Numerical Computing | NumPy |
+| Image Processing | Pillow |
+| Neural Architectures | ResNet, KAN, Attention |
+| Sequence Learning | CTC |
+| Experiment Monitoring | TensorBoard |
+| Environment Management | pip, Conda |
+| Version Control | Git |
 
 ---
 
-## 8. Reproducibility
+## Reproducibility
 
-- Procedural data is seeded by `(base_seed, epoch, index)`; pass `--seed` to fix runs.
-- Checkpoints persist model / optimizer / scheduler / loss / GradScaler / RNG
-  state and the curriculum cursor for bit-faithful resume.
-- Dependencies are locked in `requirements.txt` / `environment.yml`.
+Reproducibility is an important consideration in experimental
+machine learning.
+
+The original implementation documents support for:
+
+- Deterministic procedural data generation.
+- Seed-controlled experimentation.
+- Separate training and validation data generation.
+- Model checkpointing.
+- Optimizer and scheduler state preservation.
+- Experiment monitoring.
+- Structural ablation studies.
+- Dependency configuration files.
+
+Experimental results should always be interpreted in the context
+of the corresponding dataset, architecture and hardware settings.
+
+---
+
+## Responsible Research
+
+This repository is intended for educational study of computer
+vision, neural network architectures and visual sequence
+recognition using synthetic or explicitly authorized datasets.
+
+It is not intended for bypassing CAPTCHA protections,
+automating access to protected services or circumventing
+website security mechanisms.
+
+Potential defensive research applications include understanding
+the limitations of visual verification systems and investigating
+more robust and accessible verification mechanisms.
+
+---
+
+## Research Limitations
+
+- Synthetic data may not represent real-world distributions.
+- Results depend on the experimental configuration.
+- Architectural improvements require controlled comparisons.
+- Recognition accuracy alone does not establish generalization.
+- Computational performance depends on hardware and software.
+- Independent reproduction is necessary to validate reported
+  experimental claims.
+
+---
+
+## Research Directions
+
+- Investigate the interpretability of KAN-based representations.
+- Analyze feature representations across architectural variants.
+- Study computational efficiency and parameter utilization.
+- Examine uncertainty estimation in visual sequence recognition.
+- Compare generalization across controlled synthetic distributions.
+- Explore accessibility-oriented verification research.
+- Improve experimental documentation and reproducibility.
+
+---
+
+## References
+
+1. He et al., **Deep Residual Learning for Image Recognition**.
+
+2. Liu et al., **KAN: Kolmogorov–Arnold Networks**.
+
+3. Graves et al., **Connectionist Temporal Classification:
+   Labelling Unsegmented Sequence Data with Recurrent Neural
+   Networks**.
+
+4. Bengio et al., **Curriculum Learning**.
+
+---
+
+## Acknowledgements and Attribution
+
+This repository contains an imported reference implementation
+of the VL-KAN research project.
+
+Credit for the original architecture, implementation and
+experimental work belongs to the original developers.
+
+Original source and applicable licensing information should
+be retained with the repository.
+
+Redistribution is subject to the permissions of the original
+copyright holders.
+
+---
+
+<div align="center">
+
+**Exploring the intersection of Computer Vision,
+Sequence Learning and Adaptive Neural Architectures.**
+
+Deep Learning · Computer Vision · Machine Learning Research
+
+</div>
